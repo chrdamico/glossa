@@ -4,6 +4,7 @@ import { sceneSVG, shapeIcon, PIGMENT, setPatterns, PATTERN_DEFS } from './rende
 import { sfx, setMuted } from './audio.js';
 import { describeGrammar, lexiconEntries, glossVerdict } from './grammar.js';
 import { initPWA } from './pwa.js';
+import { db, getRun, newRun, touchRun, finishRun, touchSettings, stats, exportCode, importCode, onExternalChange } from './store.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const DIFF_LABEL = { novice: 'Novice', scholar: 'Scholar', polyglot: 'Polyglot' };
@@ -29,29 +30,12 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const store = {
-  get(k, d) {
-    try {
-      const v = localStorage.getItem(k);
-      return v ? JSON.parse(v) : d;
-    } catch {
-      return d;
-    }
-  },
-  set(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ }
-  },
-  del(k) {
-    try { localStorage.removeItem(k); } catch { /* storage unavailable */ }
-  },
-};
-
-const settings = store.get('glossa:settings', { muted: false, seenHelp: false, difficulty: 'scholar' });
+const settings = db.settings;
 setMuted(settings.muted);
 setPatterns(settings.patterns);
 document.body.insertAdjacentHTML('afterbegin', PATTERN_DEFS);
 document.body.classList.toggle('patterns', !!settings.patterns);
-const saveSettings = () => store.set('glossa:settings', settings);
+const saveSettings = () => touchSettings();
 
 let run = null;
 let save = null;
@@ -61,8 +45,40 @@ function todayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-const slotKey = (mode) => 'glossa:run:' + mode;
-const persist = () => save && store.set(slotKey(save.mode), save);
+let adoptPending = false;
+
+function persist() {
+  if (save && touchRun(save) !== save) scheduleAdopt();
+}
+
+function scheduleAdopt() {
+  if (adoptPending) return;
+  adoptPending = true;
+  setTimeout(adoptExternal, 0);
+}
+
+function adoptExternal() {
+  adoptPending = false;
+  const screen = document.body.dataset.screen;
+  if (screen === 'title') return renderTitle();
+  if (!save || save.phase === 'done') return;
+  const s = getRun(save.mode, GEN_VERSION);
+  if (!s || s === save) return;
+  if (s.seed !== save.seed) run = generateRun(s.seed, s.difficulty);
+  save = s;
+  closeGloss();
+  hideOverlay();
+  if (save.phase === 'done') renderEnd();
+  else enterGame();
+  toast('Synced with your other window.');
+}
+
+onExternalChange(() => {
+  setMuted(settings.muted);
+  setPatterns(settings.patterns);
+  document.body.classList.toggle('patterns', !!settings.patterns);
+  scheduleAdopt();
+});
 
 /* ---------- screens ---------- */
 
@@ -78,7 +94,7 @@ function renderTitle() {
   const tk = todayKey();
   const daily = loadSlot('daily');
   const dailyLive = daily && daily.date === tk ? daily : null;
-  const dailyDone = store.get('glossa:dailyResults', {})[tk];
+  const dailyDone = db.daily[tk];
   const free = loadSlot('free');
   const d = new Date();
   const dateStr = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -116,7 +132,7 @@ function renderTitle() {
           </div>
         </div>
       </div>
-      <button class="link" data-act="help">How to play</button>
+      <div class="btn-row center"><button class="link" data-act="help">How to play</button><button class="link" data-act="backup">Backup</button></div>
       ${statsLine()}
       <p class="foot">Every language is generated on the spot. Every puzzle is solvable from what you have seen.</p>
     </div>`;
@@ -124,7 +140,7 @@ function renderTitle() {
 }
 
 function dailyStreak() {
-  const res = store.get('glossa:dailyResults', {});
+  const res = db.daily;
   const d = new Date();
   const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
   if (!res[key(d)]) d.setDate(d.getDate() - 1);
@@ -137,7 +153,7 @@ function dailyStreak() {
 }
 
 function statsLine() {
-  const st = store.get('glossa:stats', { done: 0, flawless: 0 });
+  const st = stats();
   if (!st.done) return '';
   const streak = dailyStreak();
   return `<p class="stats-line">${st.done} tongue${st.done === 1 ? '' : 's'} deciphered · ${st.flawless} flawless${streak ? ` · daily streak ${streak}` : ''}</p>`;
@@ -170,23 +186,19 @@ function titleGlyphs() {
 function startRun(mode, difficulty) {
   const seed = mode === 'daily' ? 'daily-' + todayKey() : 'free-' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
   run = generateRun(seed, difficulty);
-  save = {
+  save = newRun({
     v: GEN_VERSION, seed, difficulty, mode, date: mode === 'daily' ? todayKey() : null,
     ci: 0, k: 0, phase: 'intro',
     results: run.chambers.map(() => ({ mistakes: 0, digs: 0, outcomes: [] })),
     given: {}, dug: [], glosses: {},
-  };
-  persist();
+  });
+  if (save.seed !== seed) run = generateRun(save.seed, save.difficulty);
+  if (save.phase === 'done') return renderEnd();
   enterGame();
 }
 
 function loadSlot(mode) {
-  const s = store.get(slotKey(mode), null);
-  if (s && s.v !== GEN_VERSION) {
-    store.del(slotKey(mode));
-    return null;
-  }
-  return s;
+  return getRun(mode, GEN_VERSION);
 }
 
 function resumeRun(mode) {
@@ -574,18 +586,7 @@ function next() {
       if (n) toast(`${n} new tablet${n === 1 ? '' : 's'} unearthed.`);
     } else {
       save.phase = 'done';
-      persist();
-      const stats = store.get('glossa:stats', { done: 0, flawless: 0 });
-      const tt = totals();
-      stats.done++;
-      if (tt.mistakes + tt.digs === 0) stats.flawless++;
-      store.set('glossa:stats', stats);
-      if (save.mode === 'daily') {
-        const all = store.get('glossa:dailyResults', {});
-        const t = totals();
-        all[save.date] = { ...t, seals: run.chambers.map((_, i) => sealOf(i)) };
-        store.set('glossa:dailyResults', all);
-      }
+      if (finishRun(save, { ...totals(), seals: run.chambers.map((_, i) => sealOf(i)) }) !== save) scheduleAdopt();
       hideOverlay();
       renderEnd();
     }
@@ -783,6 +784,39 @@ function showHelp(after, first = false) {
     <button class="btn primary wide" data-ov="ok">${first ? 'Begin deciphering' : document.body.dataset.screen === 'game' ? 'Back to the tablets' : 'Got it'}</button>`, () => after && after(), 'help');
 }
 
+function showBackup() {
+  showOverlay(`
+    <h2>Backup</h2>
+    <p>Move your progress to another browser or phone. Restoring only adds progress, it never removes any.</p>
+    <div class="btn-row center"><button class="btn" data-act="copyCode">Copy backup code</button></div>
+    <textarea id="codeBox" class="code" rows="4" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste a backup code to restore"></textarea>
+    <div class="btn-row center"><button class="btn primary" data-act="restoreCode">Restore</button><button class="btn ghost" data-ov="close">Close</button></div>`, null, 'backup');
+}
+
+async function copyCode() {
+  const code = exportCode();
+  try {
+    await navigator.clipboard.writeText(code);
+    toast('Backup code copied.');
+  } catch {
+    const box = $('#codeBox');
+    box.value = code;
+    box.select();
+    toast('Copy the code from the box.');
+  }
+}
+
+function restoreCode() {
+  try {
+    const n = importCode($('#codeBox').value);
+    hideOverlay();
+    renderTitle();
+    toast(n > 0 ? `Restored. ${n} more tongue${n === 1 ? '' : 's'} deciphered.` : 'Restored.');
+  } catch {
+    toast('That is not a Glossa backup code.');
+  }
+}
+
 /* ---------- end ---------- */
 
 function renderEnd() {
@@ -864,6 +898,9 @@ function act(name, el) {
     case 'playFree': sfx.tap(); return startRun('free', settings.difficulty || 'scholar');
     case 'contFree': sfx.tap(); return resumeRun('free');
     case 'help': return showHelp();
+    case 'backup': return showBackup();
+    case 'copyCode': return copyCode();
+    case 'restoreCode': return restoreCode();
     case 'title': return renderTitle();
     case 'sound':
       settings.muted = !settings.muted;
@@ -971,6 +1008,7 @@ document.addEventListener('click', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.target && e.target.id === 'codeBox') return;
   if (e.target && e.target.id === 'gtext') {
     if (e.key === 'Enter') {
       const v = e.target.value.trim();
