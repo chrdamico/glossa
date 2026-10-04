@@ -1,4 +1,30 @@
+let deferred = null;
+
+export function isStandalone() {
+  return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+export function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export async function promptInstall() {
+  if (!deferred) return null;
+  const e = deferred;
+  deferred = null;
+  e.prompt();
+  const { outcome } = await e.userChoice;
+  return outcome === 'accepted';
+}
+
 export function initPWA({ onUpdate } = {}) {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferred = e;
+  });
+  window.addEventListener('appinstalled', () => {
+    deferred = null;
+  });
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => {

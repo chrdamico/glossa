@@ -3,7 +3,7 @@ import { trueSentences, formatMorphs } from './lang.js';
 import { sceneSVG, shapeIcon, PIGMENT, setPatterns, PATTERN_DEFS } from './render.js';
 import { sfx, setMuted } from './audio.js';
 import { describeGrammar, lexiconEntries, glossVerdict } from './grammar.js';
-import { initPWA } from './pwa.js';
+import { initPWA, isStandalone, isIOS, promptInstall } from './pwa.js';
 import { db, getRun, newRun, touchRun, finishRun, touchSettings, stats, exportCode, importCode, onExternalChange } from './store.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -132,7 +132,7 @@ function renderTitle() {
           </div>
         </div>
       </div>
-      <div class="btn-row center"><button class="link" data-act="help">How to play</button><button class="link" data-act="backup">Backup</button></div>
+      <div class="btn-row center"><button class="link" data-act="help">How to play</button><button class="link" data-act="backup">Backup</button>${isStandalone() ? '' : '<button class="link" data-act="install">Install app</button>'}</div>
       ${statsLine()}
       <p class="foot">Every language is generated on the spot. Every puzzle is solvable from what you have seen.</p>
     </div>`;
@@ -784,6 +784,17 @@ function showHelp(after, first = false) {
     <button class="btn primary wide" data-ov="ok">${first ? 'Begin deciphering' : document.body.dataset.screen === 'game' ? 'Back to the tablets' : 'Got it'}</button>`, () => after && after(), 'help');
 }
 
+async function install() {
+  const ok = await promptInstall();
+  if (ok) return toast('Installing… Look for Glossa on your home screen.');
+  if (ok === false) return;
+  showOverlay(`
+    <h2>Install Glossa</h2>
+    <p>${isIOS() ? 'Open this page in <b>Safari</b>, tap <b>Share</b>, then <b>Add to Home Screen</b>.' : 'Open the browser menu <b>⋮</b> and choose <b>Install app</b> or <b>Add to home screen</b>, then <b>Install</b>.'}</p>
+    <p class="muted">If the browser says Glossa is already installed, look for it in your app list.</p>
+    <button class="btn primary wide" data-ov="ok">Got it</button>`);
+}
+
 function showBackup() {
   showOverlay(`
     <h2>Backup</h2>
@@ -899,6 +910,7 @@ function act(name, el) {
     case 'contFree': sfx.tap(); return resumeRun('free');
     case 'help': return showHelp();
     case 'backup': return showBackup();
+    case 'install': return install();
     case 'copyCode': return copyCode();
     case 'restoreCode': return restoreCode();
     case 'title': return renderTitle();
