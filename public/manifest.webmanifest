@@ -1,0 +1,17 @@
+{
+  "name": "Glossa",
+  "short_name": "Glossa",
+  "description": "Decipher a language that does not exist. A puzzle game of tablets, pictures and grammar.",
+  "id": "/glossa/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#121018",
+  "theme_color": "#121018",
+  "categories": ["games", "puzzle", "education"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

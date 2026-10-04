@@ -6,6 +6,8 @@
   "description": "Decipher a language that does not exist.",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "serve": "npx -y http-server public -p 8123 -c-1"
+    "serve": "npx -y http-server public -p 8123 -c-1",
+    "icons": "python3 tools/make-icons.py",
+    "stamp": "node tools/stamp-sw.mjs"
   }
 }

@@ -3,6 +3,7 @@ import { trueSentences, formatMorphs } from './lang.js';
 import { sceneSVG, shapeIcon, PIGMENT, setPatterns, PATTERN_DEFS } from './render.js';
 import { sfx, setMuted } from './audio.js';
 import { describeGrammar, lexiconEntries, glossVerdict } from './grammar.js';
+import { initPWA } from './pwa.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const DIFF_LABEL = { novice: 'Novice', scholar: 'Scholar', polyglot: 'Polyglot' };
@@ -832,12 +833,19 @@ function shareText() {
   return `${head}\n${seals}\n${t.mistakes} mistake${t.mistakes === 1 ? '' : 's'} · ${t.digs} dig${t.digs === 1 ? '' : 's'}\n${location.origin}${location.pathname}`;
 }
 
-function toast(msg) {
+function toast(msg, { action, onAction, ms = 1800 } = {}) {
   const el = $('#toast');
   el.textContent = msg;
+  el.classList.toggle('act', !!action);
+  if (action) {
+    const b = document.createElement('button');
+    b.textContent = action;
+    b.addEventListener('click', onAction);
+    el.append(b);
+  }
   el.classList.add('on');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('on'), 1800);
+  toast.t = setTimeout(() => el.classList.remove('on'), ms);
 }
 
 function renderAll() {
@@ -1027,3 +1035,4 @@ window.addEventListener('resize', () => {
 window.glossaDebug = () => ({ run, save });
 
 renderTitle();
+initPWA({ onUpdate: () => toast('Glossa was updated.', { action: 'Reload', onAction: () => location.reload(), ms: 12000 }) });

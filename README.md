@@ -2,7 +2,7 @@
 
 Decipher a language that does not exist.
 
-**Play:** https://chrdamico.github.io/glossa/
+**Play:** https://chrdamico.github.io/glossa/ (installable, works offline)
 
 Every run generates a new language: its words, its word order and a handful of
 strange rules (counter words, a dual, reduplication, vowel harmony, case
@@ -42,4 +42,6 @@ node tools/stats.mjs 300                # evidence / challenge statistics
 node tools/novelty.mjs 200              # how often a challenge needs a new sentence shape
 ```
 
-No build step, no dependencies. The site is `public/`.
+No build step, no dependencies. The site is `public/`. The deploy workflow runs
+`tools/stamp-sw.mjs` to put the version and asset list into `public/sw.js`.
+`npm run icons` redraws the app icons (needs Pillow).
