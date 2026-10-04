@@ -116,9 +116,30 @@ function renderTitle() {
         </div>
       </div>
       <button class="link" data-act="help">How to play</button>
+      ${statsLine()}
       <p class="foot">Every language is generated on the spot. Every puzzle is solvable from what you have seen.</p>
     </div>`;
   show('title');
+}
+
+function dailyStreak() {
+  const res = store.get('glossa:dailyResults', {});
+  const d = new Date();
+  const key = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  if (!res[key(d)]) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (res[key(d)]) {
+    n++;
+    d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+
+function statsLine() {
+  const st = store.get('glossa:stats', { done: 0, flawless: 0 });
+  if (!st.done) return '';
+  const streak = dailyStreak();
+  return `<p class="stats-line">${st.done} tongue${st.done === 1 ? '' : 's'} deciphered · ${st.flawless} flawless${streak ? ` · daily streak ${streak}` : ''}</p>`;
 }
 
 function diffNote(d) {
@@ -553,6 +574,11 @@ function next() {
     } else {
       save.phase = 'done';
       persist();
+      const stats = store.get('glossa:stats', { done: 0, flawless: 0 });
+      const tt = totals();
+      stats.done++;
+      if (tt.mistakes + tt.digs === 0) stats.flawless++;
+      store.set('glossa:stats', stats);
       if (save.mode === 'daily') {
         const all = store.get('glossa:dailyResults', {});
         const t = totals();

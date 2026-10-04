@@ -94,6 +94,7 @@ button { font: inherit; color: inherit; }
 .seg button { flex: 1; background: none; border: none; padding: 8px 4px; border-radius: 8px; cursor: pointer; color: var(--ink2); font-weight: 600; font-size: 14px; }
 .seg button.on { background: var(--slate2); color: var(--gold2); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset; }
 .foot { color: var(--muted); font-size: 13px; margin-top: 18px; }
+.stats-line { color: var(--ink2); font-size: 14px; margin: 4px 0 0; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
   .cards { grid-template-columns: 1fr; }
 }
