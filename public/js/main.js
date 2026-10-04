@@ -1,4 +1,4 @@
-import { generateRun, answerTablet } from './curriculum.js';
+import { generateRun, answerTablet, GEN_VERSION } from './curriculum.js';
 import { trueSentences, formatMorphs } from './lang.js';
 import { sceneSVG, shapeIcon, PIGMENT, setPatterns, PATTERN_DEFS } from './render.js';
 import { sfx, setMuted } from './audio.js';
@@ -75,16 +75,16 @@ function renderTitle() {
   closeGloss();
   hideOverlay();
   const tk = todayKey();
-  const daily = store.get(slotKey('daily'), null);
+  const daily = loadSlot('daily');
   const dailyLive = daily && daily.date === tk ? daily : null;
   const dailyDone = store.get('glossa:dailyResults', {})[tk];
-  const free = store.get(slotKey('free'), null);
+  const free = loadSlot('free');
   const d = new Date();
   const dateStr = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   let dailyAction;
   if (dailyDone) {
     dailyAction = `<div class="done-line">${sealsText(dailyDone.seals)} <span>${dailyDone.mistakes} mistake${dailyDone.mistakes === 1 ? '' : 's'} · ${dailyDone.digs} dig${dailyDone.digs === 1 ? '' : 's'}</span></div>
-      <button class="btn" data-act="reviewDaily">Review</button>`;
+      ${dailyLive ? '<button class="btn" data-act="reviewDaily">Review</button>' : ''}`;
   } else if (dailyLive && dailyLive.phase !== 'done') {
     dailyAction = `<button class="btn primary" data-act="contDaily">Continue · Chamber ${ROMAN[dailyLive.ci]}</button>`;
   } else {
@@ -149,7 +149,7 @@ function startRun(mode, difficulty) {
   const seed = mode === 'daily' ? 'daily-' + todayKey() : 'free-' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
   run = generateRun(seed, difficulty);
   save = {
-    v: 1, seed, difficulty, mode, date: mode === 'daily' ? todayKey() : null,
+    v: GEN_VERSION, seed, difficulty, mode, date: mode === 'daily' ? todayKey() : null,
     ci: 0, k: 0, phase: 'intro',
     results: run.chambers.map(() => ({ mistakes: 0, digs: 0, outcomes: [] })),
     given: {}, dug: [], glosses: {},
@@ -158,8 +158,17 @@ function startRun(mode, difficulty) {
   enterGame();
 }
 
-function resumeRun(mode) {
+function loadSlot(mode) {
   const s = store.get(slotKey(mode), null);
+  if (s && s.v !== GEN_VERSION) {
+    store.del(slotKey(mode));
+    return null;
+  }
+  return s;
+}
+
+function resumeRun(mode) {
+  const s = loadSlot(mode);
   if (!s) return renderTitle();
   save = s;
   run = generateRun(save.seed, save.difficulty);
@@ -892,7 +901,10 @@ document.addEventListener('click', (e) => {
     return;
   }
   const tile = t.closest('[data-tile]');
-  if (tile && save && save.phase === 'play') return addTile(tile.dataset.tile, tile.dataset.suf === '1');
+  if (tile && save && save.phase === 'play') {
+    tile.blur();
+    return addTile(tile.dataset.tile, tile.dataset.suf === '1');
+  }
   const ansM = t.closest('#answer .m');
   if (ansM && save.phase === 'play') {
     ui.compose.splice(+ansM.dataset.i, 1);

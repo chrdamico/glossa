@@ -137,8 +137,10 @@ function category(k) {
   return k.split(/[:.|]/)[0];
 }
 
+export const GEN_VERSION = 3;
+
 export function generateRun(seed, difficulty = 'scholar') {
-  const rng = new RNG(`${seed}:${difficulty}`);
+  const rng = new RNG(`${seed}:${difficulty}:v${GEN_VERSION}`);
   const lang = generateLanguage(rng.fork('lang'), difficulty);
   const ctx = {
     lang,
