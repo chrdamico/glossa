@@ -1,0 +1,11 @@
+{
+  "name": "glossa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Decipher a language that does not exist.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "serve": "npx -y http-server public -p 8123 -c-1"
+  }
+}

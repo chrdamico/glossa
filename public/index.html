@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Glossa</title>
+  <meta name="description" content="Decipher a language that does not exist. A puzzle game of tablets, pictures and grammar.">
+  <meta name="theme-color" content="#121018">
+  <meta property="og:title" content="Glossa">
+  <meta property="og:description" content="Decipher a language that does not exist.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-screen="title">
+  <section id="title" class="screen"></section>
+  <section id="game" class="screen hidden">
+    <header id="hud"></header>
+    <div id="panes">
+      <main id="codex" aria-label="Codex of tablets"></main>
+      <aside id="panel" aria-label="Challenge"></aside>
+    </div>
+  </section>
+  <section id="end" class="screen hidden"></section>
+  <div id="gloss" class="hidden" role="dialog" aria-label="Gloss a word"></div>
+  <div id="overlay" class="hidden"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <noscript>Glossa needs JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
