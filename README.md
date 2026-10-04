@@ -6,7 +6,7 @@ Decipher a language that does not exist.
 
 Every run generates a new language: its words, its word order and a handful of
 strange rules (counter words, a dual, reduplication, vowel harmony, case
-suffixes, counting in threes, ...). You only get tablets: a picture and the
+suffixes, counting in threes, one word for blue and green, ...). You only get tablets: a picture and the
 sentence that describes it. From these you work out the grammar, chamber by
 chamber, and prove it in three kinds of challenge:
 
@@ -39,6 +39,7 @@ npm test          # headless generation + solvability checks
 npm run serve     # http://localhost:8123
 node tools/gen.mjs some-seed polyglot   # print a generated run (spoilers)
 node tools/stats.mjs 300                # evidence / challenge statistics
+node tools/novelty.mjs 200              # how often a challenge needs a new sentence shape
 ```
 
 No build step, no dependencies. The site is `public/`.
