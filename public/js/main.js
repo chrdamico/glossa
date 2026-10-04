@@ -1,6 +1,6 @@
 import { generateRun, answerTablet } from './curriculum.js';
 import { trueSentences, formatMorphs } from './lang.js';
-import { sceneSVG, shapeIcon, PIGMENT } from './render.js';
+import { sceneSVG, shapeIcon, PIGMENT, setPatterns, PATTERN_DEFS } from './render.js';
 import { sfx, setMuted } from './audio.js';
 import { describeGrammar, lexiconEntries, glossVerdict } from './grammar.js';
 
@@ -47,11 +47,14 @@ const store = {
 
 const settings = store.get('glossa:settings', { muted: false, seenHelp: false, difficulty: 'scholar' });
 setMuted(settings.muted);
+setPatterns(settings.patterns);
+document.body.insertAdjacentHTML('afterbegin', PATTERN_DEFS);
+document.body.classList.toggle('patterns', !!settings.patterns);
 const saveSettings = () => store.set('glossa:settings', settings);
 
 let run = null;
 let save = null;
-const ui = { compose: [], typed: '', sel: null, rendered: new Set(), firstRender: true, glossFor: null, collapsed: false };
+const ui = { compose: [], typed: '', sel: null, rendered: new Set(), firstRender: true, glossFor: null, collapsed: false, folded: new Set() };
 
 function todayKey() {
   const d = new Date();
@@ -165,6 +168,7 @@ function resumeRun(mode) {
 }
 
 function enterGame() {
+  ui.folded = new Set();
   ui.rendered = new Set();
   ui.firstRender = true;
   resetChallengeUI();
@@ -173,7 +177,7 @@ function enterGame() {
   if (!settings.seenHelp) {
     settings.seenHelp = true;
     saveSettings();
-    showHelp(() => phaseOverlay());
+    showHelp(() => phaseOverlay(), true);
   } else {
     phaseOverlay();
   }
@@ -240,7 +244,7 @@ function glossHTML(code) {
   const t = code[0];
   const v = code.slice(2);
   if (t === 'S') return shapeIcon(v, '#d9ccb0', 13);
-  if (t === 'C') return `<span class="dot" style="background:${PIGMENT[v]}"></span>`;
+  if (t === 'C') return `<span class="dot" data-c="${v[0].toUpperCase()}" style="background:${PIGMENT[v]}"></span>`;
   if (t === 'N') return `<span class="gnum">${v}</span>`;
   if (t === 'G') return `<span class="gsym">${GSYM[v] || '?'}</span>`;
   return `<span class="gtext">${esc(v)}</span>`;
@@ -277,9 +281,9 @@ function renderCodex() {
   let html = `<div class="codex-head"><h2>Codex</h2><span class="muted small">${entries.length} tablets · tap a word to gloss it</span></div>`;
   for (let c = last; c >= 0; c--) {
     const list = entries.filter((e) => e.c === c);
-    html += `<section class="chap${c === save.ci ? ' current' : ''}">
-      <h3><span class="rn">${ROMAN[c]}</span>${esc(run.chambers[c].def.name)}</h3>
-      <div class="grid">${list.map(tabletHTML).join('')}</div>
+    html += `<section class="chap${c === save.ci ? ' current' : ''}${ui.folded.has(c) ? ' folded' : ''}" data-chap="${c}">
+      <h3 data-fold="${c}" title="Show or hide"><span class="rn">${ROMAN[c]}</span>${esc(run.chambers[c].def.name)}<span class="cnt">${list.length}</span><span class="fold">${ICON.chevron}</span></h3>
+      ${list.length ? `<div class="grid">${list.map(tabletHTML).join('')}</div>` : '<p class="muted small empty-chap">No new tablets here. Everything you need is already in your codex.</p>'}
     </section>`;
   }
   $('#codex').innerHTML = html;
@@ -529,13 +533,14 @@ function next() {
     if (save.ci + 1 < run.chambers.length) {
       save.ci++;
       save.k = 0;
-      save.phase = 'intro';
+      save.phase = 'play';
       resetChallengeUI();
       persist();
       renderAll();
       $('#codex').scrollTop = 0;
       window.scrollTo(0, 0);
-      phaseOverlay();
+      const n = run.chambers[save.ci].evidence.length;
+      if (n) toast(`${n} new tablet${n === 1 ? '' : 's'} unearthed.`);
     } else {
       save.phase = 'done';
       persist();
@@ -616,7 +621,7 @@ function openGloss(m, anchor) {
   el.innerHTML = `
     <div class="gh"><b class="alien">${suf ? '·' : ''}${m}</b><span class="muted small">in ${count} tablet${count === 1 ? '' : 's'} (others fade)</span><button class="icon-btn" data-gclose aria-label="Close">${ICON.cross}</button></div>
     <div class="gsec"><label>Shape</label><div class="gopts">${L.shapes.map((s) => opt('S:' + s, shapeIcon(s, '#e8dcc0', 18), s)).join('')}</div></div>
-    <div class="gsec"><label>Colour</label><div class="gopts">${L.colors.map((c) => opt('C:' + c, `<span class="dot big" style="background:${PIGMENT[c]}"></span>`, c)).join('')}</div></div>
+    <div class="gsec"><label>Colour</label><div class="gopts">${L.colors.map((c) => opt('C:' + c, `<span class="dot big" data-c="${c[0].toUpperCase()}" style="background:${PIGMENT[c]}"></span>`, c)).join('')}</div></div>
     <div class="gsec"><label>Number</label><div class="gopts">${[1, 2, 3, 4, 5, 6].map((n) => opt('N:' + n, `<span class="gnum">${n}</span>`, String(n))).join('')}</div></div>
     <div class="gsec"><label>Grammar</label><div class="gopts">${Object.keys(GSYM).map((k) => opt('G:' + k, `<span class="gsym">${GSYM[k]}</span>`, GTITLE[k])).join('')}</div></div>
     <div class="gsec grow-row"><input id="gtext" maxlength="10" placeholder="Own note, then Enter" value="${cur && cur.startsWith('T:') ? esc(cur.slice(2)) : ''}" autocomplete="off"><button class="btn ghost sm" data-g="">Clear</button></div>`;
@@ -668,6 +673,7 @@ function showOverlay(html, onPrimary, cls = '') {
   o.innerHTML = `<div class="ov-card ${cls}">${html}</div>`;
   o.classList.remove('hidden');
   o.onclick = (e) => {
+    if (e.target.closest('[data-act]')) return;
     const b = e.target.closest('[data-ov]');
     if (b) { hideOverlay(); onPrimary && onPrimary(b.dataset.ov); }
   };
@@ -703,23 +709,32 @@ function phaseOverlay() {
     const r = save.results[save.ci];
     const seal = sealOf(save.ci);
     const word = { gold: 'Flawless', silver: 'Nearly flawless', bronze: 'Cleared' }[seal];
-    const last = save.ci + 1 >= run.chambers.length;
+    const nextCh = run.chambers[save.ci + 1];
+    const nextHTML = nextCh ? `
+      <div class="next-ch">
+        <div class="eyebrow">Next · Chamber ${ROMAN[save.ci + 1]}</div>
+        <h3>${esc(nextCh.def.name)}</h3>
+        <p class="muted">${esc(nextCh.def.blurb)} ${nextCh.evidence.length ? `${nextCh.evidence.length} new tablet${nextCh.evidence.length === 1 ? '' : 's'}.` : 'No new tablets.'}</p>
+      </div>` : '';
     showOverlay(`
       <div class="big-seal ${seal}"></div>
       <div class="eyebrow">Chamber ${ROMAN[save.ci]} · ${word}</div>
       <h2>${esc(run.chambers[save.ci].def.name)}</h2>
       <p class="muted">${r.mistakes} mistake${r.mistakes === 1 ? '' : 's'} · ${r.digs} dig${r.digs === 1 ? '' : 's'}</p>
-      <button class="btn primary wide" data-ov="go">${last ? 'Read the whole grammar' : 'Onward'}</button>`, () => next(), 'cleared');
+      ${nextHTML}
+      <button class="btn primary wide" data-ov="go">${nextCh ? 'Enter chamber ' + ROMAN[save.ci + 1] : 'Read the whole grammar'}</button>`, () => next(), 'cleared');
   }
 }
 
-function showHelp(after) {
-  const ex = [
-    { layout: 'single', groups: [{ shape: 'star', color: 'yellow', n: 2 }] },
-    { layout: 'mixed', groups: [{ shape: 'circle', color: 'red', n: 2 }, { shape: 'square', color: 'blue', n: 1 }] },
-    { layout: 'vert', groups: [{ shape: 'triangle', color: 'green', n: 1 }, { shape: 'ring', color: 'white', n: 3 }] },
-    { layout: 'horiz', groups: [{ shape: 'flower', color: 'blue', n: 1 }, { shape: 'cross', color: 'red', n: 2 }] },
-  ];
+const HELP_SCENES = [
+  { layout: 'single', groups: [{ shape: 'star', color: 'yellow', n: 2 }] },
+  { layout: 'mixed', groups: [{ shape: 'circle', color: 'red', n: 2 }, { shape: 'square', color: 'blue', n: 1 }] },
+  { layout: 'vert', groups: [{ shape: 'triangle', color: 'green', n: 1 }, { shape: 'ring', color: 'white', n: 3 }] },
+  { layout: 'horiz', groups: [{ shape: 'flower', color: 'blue', n: 1 }, { shape: 'cross', color: 'red', n: 2 }] },
+];
+
+function showHelp(after, first = false) {
+  const ex = HELP_SCENES;
   const names = ['One group', 'Mixed together', 'Stacked', 'Side by side'];
   showOverlay(`
     <h2>How to play</h2>
@@ -728,7 +743,8 @@ function showHelp(after) {
     <p><b>Tap any word</b> to gloss it with what you think it means. Your glosses appear under the word everywhere, and tablets without that word fade out so you can compare.</p>
     <p>Each chamber ends with challenges. <b>Write</b>: build the sentence for a picture. <b>Read</b>: pick the picture a sentence describes. <b>Mend</b>: find the one wrong word. A sentence may hold a word you have never seen: think about what it could be.</p>
     <p class="muted">Every challenge can be solved from what you have seen. Unsure? <b>Dig</b> up one more tablet, at the cost of a point. A wrong answer is not the end: the right one is carved into your codex.</p>
-    <button class="btn primary wide" data-ov="ok">Begin deciphering</button>`, () => after && after(), 'help');
+    <div class="help-row"><button class="btn ghost sm" data-act="patterns">${settings.patterns ? 'Colour patterns: on' : 'Colour patterns: off'}</button><span class="muted small">Adds stripes, dots and grids to the colours.</span></div>
+    <button class="btn primary wide" data-ov="ok">${first ? 'Begin deciphering' : document.body.dataset.screen === 'game' ? 'Back to the tablets' : 'Got it'}</button>`, () => after && after(), 'help');
 }
 
 /* ---------- end ---------- */
@@ -811,6 +827,15 @@ function act(name, el) {
       setMuted(settings.muted);
       saveSettings();
       return renderHUD();
+    case 'patterns':
+      settings.patterns = !settings.patterns;
+      setPatterns(settings.patterns);
+      document.body.classList.toggle('patterns', settings.patterns);
+      saveSettings();
+      el.textContent = settings.patterns ? 'Colour patterns: on' : 'Colour patterns: off';
+      $$('.help-pics figure svg').forEach((svg, i) => (svg.outerHTML = sceneSVG(HELP_SCENES[i])));
+      if (document.body.dataset.screen === 'game') { renderCodex(); renderPanel(); }
+      return;
     case 'collapse':
       if (window.innerWidth >= 900) return;
       ui.collapsed = !ui.collapsed;
@@ -857,6 +882,13 @@ document.addEventListener('click', (e) => {
     });
     $('#diffNote').textContent = diffNote(settings.difficulty);
     sfx.tap();
+    return;
+  }
+  const fold = t.closest('[data-fold]');
+  if (fold) {
+    const c = +fold.dataset.fold;
+    if (ui.folded.has(c)) ui.folded.delete(c); else ui.folded.add(c);
+    fold.parentElement.classList.toggle('folded', ui.folded.has(c));
     return;
   }
   const tile = t.closest('[data-tile]');

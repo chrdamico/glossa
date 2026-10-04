@@ -147,6 +147,7 @@ export function generateRun(seed, difficulty = 'scholar') {
     texts: new Set(),
     known: new Map(),
     tablets: [],
+    shapes: new Set(),
     chamberStart: new Set(),
     difficulty,
   };
@@ -193,8 +194,13 @@ function planEvidence(ctx, pool, c, budget, challengeKeys) {
   return null;
 }
 
+function shapeSig(morphs) {
+  return morphs.map((m) => (m.suf ? '-' : '') + m.k.split(/[:.|]/)[0]).join(' ');
+}
+
 function learn(ctx, scene, morphs) {
   ctx.tablets.push({ scene, morphs });
+  ctx.shapes.add(shapeSig(morphs));
   ctx.H = observe(ctx.H, scene, morphs);
   if (!ctx.H.length) throw new Error('true language eliminated: ' + formatMorphs(morphs));
   ctx.used.add(sceneKey(scene));
@@ -340,7 +346,7 @@ function makeCandidates(rng, ctx, def, type, shapes, colors, shapesNext, colorsN
     for (const scene of sampleScenes(rng, def, shapes, colors, 24, exclude)) {
       const sols = trueSentences(lang, scene);
       if (sols.some((m) => ctx.texts.has(formatMorphs(m)))) continue;
-      const interest = Math.min(sols[0].length, 8) + 2 * Math.min(3, freshCount(ctx, sols[0]));
+      const interest = Math.min(sols[0].length, 8) + 2 * Math.min(3, freshCount(ctx, sols[0])) + (ctx.shapes.has(shapeSig(sols[0])) ? 0 : 4);
       out.push({ type, scene, solution: sols[0], solutions: sols.map(formatMorphs), interest });
     }
   } else if (type === 'read') {

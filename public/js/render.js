@@ -10,6 +10,18 @@ export const PIGMENT = {
 };
 
 const OUTLINE = 'rgba(10,8,14,.45)';
+let patterns = false;
+
+export function setPatterns(on) {
+  patterns = !!on;
+}
+
+export const PATTERN_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <pattern id="gp-red" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="5" fill="rgba(20,10,10,.55)"/></pattern>
+  <pattern id="gp-blue" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="2.5" cy="2.5" r="1.1" fill="rgba(255,255,255,.75)"/></pattern>
+  <pattern id="gp-green" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 3H6M3 0V6" stroke="rgba(10,30,15,.55)" stroke-width="1.1"/></pattern>
+  <pattern id="gp-yellow" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="1.6" fill="rgba(60,40,0,.45)"/></pattern>
+</defs></svg>`;
 
 function f(n) {
   return Math.round(n * 100) / 100;
@@ -121,7 +133,8 @@ export function sceneSVG(scene, cls = 'pic') {
   for (const it of items) {
     const r = it.small ? R_SMALL : R_NORMAL;
     const rot = it.shape === 'circle' || it.shape === 'ring' ? 0 : it.rot;
-    body += `<g transform="translate(${f(it.x)},${f(it.y)}) rotate(${f(rot)})">${shapeMarkup(it.shape, r, PIGMENT[it.color])}</g>`;
+    const over = patterns && it.color !== 'white' ? shapeMarkup(it.shape, r, `url(#gp-${it.color})`) : '';
+    body += `<g transform="translate(${f(it.x)},${f(it.y)}) rotate(${f(rot)})">${shapeMarkup(it.shape, r, PIGMENT[it.color])}${over}</g>`;
   }
   return `<svg class="${cls}" viewBox="0 0 200 130" role="img" aria-label="${describeScene(scene)}">${body}</svg>`;
 }
