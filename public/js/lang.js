@@ -10,14 +10,17 @@ export const PARAM_SPACE = {
   na: ['NA', 'AN'],
   qpos: [0, 1, 2],
   one: [false, true],
-  plural: ['none', 'suffix', 'dual', 'redup'],
+  plural: ['none', 'suffix', 'dual', 'redup', 'adj', 'both'],
   nums: ['simple', 'base3', 'base4'],
   agr: ['none', 'suffix', 'classifier'],
   harm: [false, true],
   dim: ['suffix', 'before', 'after'],
   conj: ['medial', 'both', 'clitic'],
-  rel: ['FRG', 'GRF', 'FGR', 'GsF', 'FGs'],
+  rel: ['FRG', 'GRF', 'FGR', 'GsF', 'FGs', 'FsG'],
+  grue: [false, true],
 };
+
+export const REL_SUFFIX = new Set(['GsF', 'FGs', 'FsG']);
 
 export class Need {
   constructor(p) { this.p = p; }
@@ -60,9 +63,11 @@ function np(g, get) {
     else if (d === 'before') N = [{ k: 'SMALL' }, ...N];
     else N = [...N, { k: 'SMALL' }];
   }
-  if (pl === 'suffix') N = [...N, { k: 'PL', suf: true }];
+  if (pl === 'suffix' || pl === 'both') N = [...N, { k: 'PL', suf: true }];
   else if (pl === 'dual') N = [...N, { k: n === 2 ? 'DU' : 'PL', suf: true }];
-  let A = [{ k: 'C:' + g.color }];
+  const grue = (g.color === 'blue' || g.color === 'green') && get('grue');
+  let A = [{ k: grue ? 'C:grue' : 'C:' + g.color }];
+  if (pl === 'adj' || pl === 'both') A = [...A, { k: 'PL', suf: true }];
   const agr = get('agr');
   if (agr === 'suffix') A = [...A, { k: 'AGR.' + cls, suf: true }];
   else if (agr === 'classifier' && Q.length) Q = [...Q, { k: 'CLS.' + cls }];
@@ -102,6 +107,7 @@ export function realize(scene, get) {
       case 'GRF': alts = [[...G, { k: R }, ...F]]; break;
       case 'FGR': alts = [[...F, ...G, { k: R }]]; break;
       case 'GsF': alts = [[...G, { k: R, suf: true }, ...F]]; break;
+      case 'FsG': alts = [[...F, { k: R, suf: true }, ...G]]; break;
       default: alts = [[...F, ...G, { k: R, suf: true }]];
     }
   }
@@ -186,9 +192,11 @@ function lev(a, b) {
   return d[m][n];
 }
 
-export const EXOTICS = ['dual', 'redup', 'base', 'agrSuffix', 'classifier', 'harm', 'conj', 'relSuffix', 'one'];
+export const EXOTICS = ['dual', 'redup', 'pluralAdj', 'base', 'agrSuffix', 'classifier', 'harm', 'conj', 'relSuffix', 'one', 'grue'];
 
-export function chooseParams(rng, difficulty) {
+const PLURAL_EXOTICS = ['dual', 'redup', 'pluralAdj'];
+
+export function chooseParams(rng, difficulty, colors = COLORS) {
   const p = {
     na: rng.pick(PARAM_SPACE.na),
     qpos: rng.pick(PARAM_SPACE.qpos),
@@ -200,29 +208,33 @@ export function chooseParams(rng, difficulty) {
     dim: rng.pick(PARAM_SPACE.dim),
     conj: 'medial',
     rel: rng.pick(['FRG', 'GRF', 'FGR']),
+    grue: false,
   };
   const count = { novice: 1, scholar: 3, polyglot: 5 }[difficulty] ?? 3;
   const applied = [];
   const pool = rng.shuffle(EXOTICS);
   for (const e of pool) {
     if (applied.length >= count) break;
-    if ((e === 'dual' || e === 'redup') && (applied.includes('dual') || applied.includes('redup'))) continue;
+    if (PLURAL_EXOTICS.includes(e) && applied.some((a) => PLURAL_EXOTICS.includes(a))) continue;
+    if (e === 'grue' && !(colors.includes('blue') && colors.includes('green'))) continue;
     if ((e === 'agrSuffix' || e === 'classifier') && (applied.includes('agrSuffix') || applied.includes('classifier'))) continue;
     if (e === 'harm') continue;
-    if (difficulty === 'novice' && (e === 'classifier' || e === 'relSuffix' || e === 'redup')) continue;
+    if (difficulty === 'novice' && (e === 'classifier' || e === 'relSuffix' || e === 'redup' || e === 'grue' || e === 'pluralAdj')) continue;
     applied.push(e);
   }
   for (const e of applied) {
     if (e === 'dual') p.plural = 'dual';
     if (e === 'redup') p.plural = 'redup';
+    if (e === 'pluralAdj') p.plural = rng.pick(['adj', 'both']);
+    if (e === 'grue') p.grue = true;
     if (e === 'base') p.nums = rng.pick(['base3', 'base4']);
     if (e === 'agrSuffix') p.agr = 'suffix';
     if (e === 'classifier') p.agr = 'classifier';
     if (e === 'conj') p.conj = rng.pick(['both', 'clitic']);
-    if (e === 'relSuffix') p.rel = rng.pick(['GsF', 'FGs']);
+    if (e === 'relSuffix') p.rel = rng.pick(['GsF', 'FGs', 'FsG']);
     if (e === 'one') p.one = true;
   }
-  const hasSuffix = p.plural === 'suffix' || p.plural === 'dual' || p.agr === 'suffix' || p.dim === 'suffix' || p.conj === 'clitic' || p.rel === 'GsF' || p.rel === 'FGs';
+  const hasSuffix = p.plural !== 'none' && p.plural !== 'redup' || p.agr === 'suffix' || p.dim === 'suffix' || p.conj === 'clitic' || REL_SUFFIX.has(p.rel);
   const wantHarm = difficulty === 'polyglot' ? 0.85 : difficulty === 'scholar' ? 0.3 : 0;
   if (hasSuffix && applied.length < count + 1 && rng.chance(wantHarm)) {
     p.harm = true;
@@ -235,9 +247,13 @@ export function lexKeys(p, shapes, colors) {
   const free = [];
   const suf = [];
   for (const s of shapes) free.push({ k: 'S:' + s, syl: 2 });
-  for (const c of colors) free.push({ k: 'C:' + c, syl: 2 });
+  for (const c of colors) {
+    if (p.grue && (c === 'blue' || c === 'green')) {
+      if (!free.some((f) => f.k === 'C:grue')) free.push({ k: 'C:grue', syl: 2 });
+    } else free.push({ k: 'C:' + c, syl: 2 });
+  }
   for (let n = 1; n <= MAX_N; n++) free.push({ k: 'N:' + n, syl: 2 });
-  if (p.plural === 'suffix' || p.plural === 'dual') suf.push('PL');
+  if (p.plural !== 'none' && p.plural !== 'redup') suf.push('PL');
   if (p.plural === 'dual') suf.push('DU');
   if (p.dim === 'suffix') suf.push('DIM');
   else free.push({ k: 'SMALL', syl: 2 });
@@ -245,17 +261,17 @@ export function lexKeys(p, shapes, colors) {
   if (p.agr === 'classifier') free.push({ k: 'CLS.r', syl: 2 }, { k: 'CLS.a', syl: 2 });
   if (p.conj === 'clitic') suf.push('CONJ');
   else free.push({ k: 'CONJ', syl: 1 });
-  if (p.rel === 'GsF' || p.rel === 'FGs') suf.push('REL.V', 'REL.H');
+  if (REL_SUFFIX.has(p.rel)) suf.push('REL.V', 'REL.H');
   else free.push({ k: 'REL.V', syl: 2 }, { k: 'REL.H', syl: 2 });
   return { free, suf };
 }
 
 export function generateLanguage(rng, difficulty = 'scholar') {
-  const params = chooseParams(rng, difficulty);
   const round = rng.shuffle(SHAPES.filter((s) => SHAPE_CLASS[s] === 'r')).slice(0, 3);
   const angular = rng.shuffle(SHAPES.filter((s) => SHAPE_CLASS[s] === 'a')).slice(0, 3);
   const shapes = rng.chance(0.5) ? [...round, ...angular] : [...angular, ...round];
   const colors = rng.shuffle(COLORS).slice(0, 4);
+  const params = chooseParams(rng, difficulty, colors);
   for (let attempt = 0; attempt < 200; attempt++) {
     const lex = makeLexicon(rng, params, shapes, colors);
     if (lex) {
@@ -324,10 +340,11 @@ function makeLexicon(rng, p, shapes, colors) {
   }
   if (p.harm) {
     const nounCls = shapes.map((s) => vclass(lex['S:' + s]));
-    const colCls = colors.map((c) => vclass(lex['C:' + c]));
+    const colCls = colors.map((c) => vclass(lex['C:' + c] || lex['C:grue']));
     const both = (a) => a.filter((x) => x === 'f').length >= 2 && a.filter((x) => x === 'b').length >= 2;
     if (!both(nounCls)) return null;
-    if (p.agr === 'suffix' && !(colCls.includes('f') && colCls.includes('b'))) return null;
+    const colourSuffix = p.agr === 'suffix' || p.plural === 'adj' || p.plural === 'both';
+    if (colourSuffix && !(colCls.includes('f') && colCls.includes('b'))) return null;
   }
   return lex;
 }

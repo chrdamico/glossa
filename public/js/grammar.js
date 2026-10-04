@@ -1,4 +1,4 @@
-import { trueSentences, SHAPE_CLASS, formatMorphs } from './lang.js';
+import { trueSentences, SHAPE_CLASS, formatMorphs, REL_SUFFIX } from './lang.js';
 
 export function baseKey(k) {
   return k.split('|')[0];
@@ -7,6 +7,7 @@ export function baseKey(k) {
 export function keyLabel(k) {
   const b = baseKey(k);
   const [t, v] = b.split(':');
+  if (b === 'C:grue') return 'blue-green';
   if (t === 'S' || t === 'C') return v;
   if (t === 'N') return v;
   return {
@@ -25,6 +26,7 @@ export function glossVerdict(key, gloss) {
   if (!gloss) return null;
   if (gloss.startsWith('T:') || gloss === 'G:?') return null;
   const b = baseKey(key);
+  if (b === 'C:grue') return gloss === 'C:blue' || gloss === 'C:green';
   if (b.startsWith('S:') || b.startsWith('C:') || b.startsWith('N:')) return gloss === b;
   if (b.startsWith('AGR') || b.startsWith('CLS')) return gloss === 'G:A' || gloss === 'G:B' ? true : false;
   return (ACCEPT[b] || []).includes(gloss);
@@ -69,6 +71,13 @@ export function describeGrammar(lang) {
     example2: ex(lang, single(g(s3, c2, 3))),
   });
   if (p.plural === 'redup') rules.push({ title: 'Plural', text: 'More than one thing: the noun is said twice.', example: ex(lang, single(g(s3, c2, 2))) });
+  if (p.plural === 'adj') rules.push({ title: 'Plural', text: `More than one thing: not the noun but the colour word takes ${sufForms('PL')}.`, example: ex(lang, single(g(s3, c2, 2))) });
+  if (p.plural === 'both') rules.push({ title: 'Plural', text: `More than one thing: the noun and the colour word both take ${sufForms('PL')}.`, example: ex(lang, single(g(s3, c2, 2))) });
+  if (p.grue) rules.push({
+    title: 'Blue is green',
+    text: `The language has one colour word for both blue and green: “${lx['C:grue']}”.`,
+    example: ex(lang, { layout: 'mixed', groups: [g(s0, 'blue', 1), g(s3, 'green', 1)] }),
+  });
 
   if (p.nums !== 'simple') {
     const k = p.nums === 'base3' ? 3 : 4;
@@ -105,14 +114,15 @@ export function describeGrammar(lang) {
   }[p.conj];
   rules.push({ title: 'Together', text: `Two groups mixed together: ${conjText} Either group may come first.`, example: ex(lang, mix) });
 
-  const rv = p.rel === 'GsF' || p.rel === 'FGs' ? sufForms('REL.V') : `“${lx['REL.V']}”`;
-  const rh = p.rel === 'GsF' || p.rel === 'FGs' ? sufForms('REL.H') : `“${lx['REL.H']}”`;
+  const rv = REL_SUFFIX.has(p.rel) ? sufForms('REL.V') : `“${lx['REL.V']}”`;
+  const rh = REL_SUFFIX.has(p.rel) ? sufForms('REL.H') : `“${lx['REL.H']}”`;
   const relText = {
     FRG: `The upper (or left) group comes first, then ${rv} (or ${rh}), then the other group.`,
     GRF: `The lower (or right) group comes first, then ${rv} (or ${rh}), then the other group.`,
     FGR: `The upper (or left) group, then the other group, then ${rv} (or ${rh}) at the very end.`,
     GsF: `The lower (or right) group comes first and takes ${rv} (or ${rh}); then the upper (or left) group.`,
     FGs: `The upper (or left) group comes first; the lower (or right) group follows and takes ${rv} (or ${rh}).`,
+    FsG: `The upper (or left) group comes first and takes ${rv} (or ${rh}); then the lower (or right) group.`,
   }[p.rel];
   rules.push({ title: 'Position', text: relText, example: ex(lang, { layout: 'vert', groups: [g(s0, c0), g(s3, c1, 2)] }) });
 
@@ -145,6 +155,6 @@ function isSuffixKey(lang, b) {
   const p = lang.params;
   if (b === 'PL' || b === 'DU' || b === 'DIM' || b.startsWith('AGR')) return true;
   if (b === 'CONJ') return p.conj === 'clitic';
-  if (b.startsWith('REL')) return p.rel === 'GsF' || p.rel === 'FGs';
+  if (b.startsWith('REL')) return REL_SUFFIX.has(p.rel);
   return false;
 }

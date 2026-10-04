@@ -1,5 +1,5 @@
 import { RNG } from './rng.js';
-import { generateLanguage, trueSentences, sceneKey, formatMorphs, MAX_N } from './lang.js';
+import { generateLanguage, trueSentences, sceneKey, formatMorphs, MAX_N, REL_SUFFIX } from './lang.js';
 import { initialHypotheses, observe, predictCompose, checkRead, checkSpot } from './learner.js';
 
 const anyN = (k) => (s) => s.groups.some((g) => g.n >= k);
@@ -137,7 +137,7 @@ function category(k) {
   return k.split(/[:.|]/)[0];
 }
 
-export const GEN_VERSION = 3;
+export const GEN_VERSION = 4;
 
 export function generateRun(seed, difficulty = 'scholar') {
   const rng = new RNG(`${seed}:${difficulty}:v${GEN_VERSION}`);
@@ -315,7 +315,7 @@ function buildChamber(rng, ctx, def, ci) {
 function typesFor(def, lang) {
   const p = lang.params;
   if (def.key === 'many' && p.nums === 'simple') return ['read', 'compose'];
-  if (def.key === 'horiz') return p.rel === 'GsF' || p.rel === 'FGs' ? ['read', 'compose', 'spot'] : ['compose', 'spot'];
+  if (def.key === 'horiz') return REL_SUFFIX.has(p.rel) ? ['read', 'compose', 'spot'] : ['compose', 'spot'];
   if (def.key === 'small' && p.dim !== 'suffix') return ['compose', 'read'];
   return def.types;
 }
