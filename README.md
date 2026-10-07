@@ -43,5 +43,6 @@ node tools/novelty.mjs 200              # how often a challenge needs a new sent
 ```
 
 No build step, no dependencies. The site is `public/`. The deploy workflow runs
-`tools/stamp-sw.mjs` to put the version and asset list into `public/sw.js`.
+`tools/stamp-sw.mjs` to put the version and asset list into `public/sw.js`, and
+the version shown on the title screen into `public/js/version.js`.
 `npm run icons` redraws the app icons (needs Pillow).

@@ -1,5 +1,5 @@
 const VERSION = 'dev';
-const ASSETS = [];
+const ASSETS = ["./favicon.svg","./fonts/cinzel-latin-ext.woff2","./fonts/cinzel-latin.woff2","./icons/apple-touch-icon.png","./icons/favicon-32.png","./icons/icon-192.png","./icons/icon-512.png","./icons/maskable-512.png","./index.html","./js/audio.js","./js/curriculum.js","./js/grammar.js","./js/lang.js","./js/learner.js","./js/main.js","./js/pwa.js","./js/render.js","./js/rng.js","./js/store.js","./js/version.js","./manifest.webmanifest","./style.css"];
 const CACHE = `glossa-${VERSION}`;
 const DEV = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 

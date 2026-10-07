@@ -4,6 +4,7 @@ import { sceneSVG, shapeIcon, PIGMENT, setPatterns, PATTERN_DEFS } from './rende
 import { sfx, setMuted } from './audio.js';
 import { describeGrammar, lexiconEntries, glossVerdict } from './grammar.js';
 import { initPWA, isStandalone, isIOS, promptInstall } from './pwa.js';
+import { VERSION } from './version.js';
 import { db, getRun, newRun, touchRun, finishRun, touchSettings, stats, exportCode, importCode, onExternalChange } from './store.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -135,6 +136,7 @@ function renderTitle() {
       <div class="btn-row center"><button class="link" data-act="help">How to play</button><button class="link" data-act="backup">Backup</button>${isStandalone() ? '' : '<button class="link" data-act="install">Install app</button>'}</div>
       ${statsLine()}
       <p class="foot">Every language is generated on the spot. Every puzzle is solvable from what you have seen.</p>
+      <p class="foot">Version ${VERSION}</p>
     </div>`;
   show('title');
 }
